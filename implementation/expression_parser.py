@@ -39,6 +39,7 @@ class Lexer:
         self.current_index = 0
         self.previous_index = -1
         self.number_regular_expression = re.compile(r"[+-]?(\d+(\.\d*)?|\.\d+)(e\d+)?")
+        self.potentiation_regular_expression = re.compile(r"\*\*")
 
     def __iter__(self):
         """Responsible for returning the iterator object."""
@@ -75,21 +76,31 @@ class Lexer:
         return characther == ")"
 
     def __handle_number_or_operator(self, characther):
-        if characther in "+/*":
+        if characther in "+/":
             return Token(Lexer.OPERATOR, characther)
         
         # Finite automata can be created using a regular expression
         input_to_match = self.stream[self.current_index - 1 :]
-        match = self.number_regular_expression.match(input_to_match)
+        match_number = self.number_regular_expression.match(input_to_match)
+        next_characther = None
+        if self.current_index < len(self.stream):
+            next_characther = self.stream[self.current_index]
 
-        if match is None:
+        if characther == "*":
+            if next_characther != "*":
+                return Token(Lexer.OPERATOR, characther)
+            else:
+                self.current_index += 1
+                return Token(Lexer.OPERATOR, "**")
+
+        if match_number is None:
             if characther == "-":
                 return Token(Lexer.OPERATOR, characther)
             
             self.error()
 
-        self.current_index += match.end() - 1
-        number_value = match.group().replace(" ", "")
+        self.current_index += match_number.end() - 1
+        number_value = match_number.group().replace(" ", "")
         return Token(Lexer.NUMBER, number_value)
 
 class Parser:
@@ -102,17 +113,24 @@ class Parser:
 
     def __expression(self, lexer):
         """Parse an expression."""
-        left_expression = self.__left_expression(lexer)
+        left_expression = self.__left_addition_or_subtraction(lexer)
         right_addition_or_subtraction = self.__right_addition_or_subtraction(lexer)
 
         return left_expression if right_addition_or_subtraction is None else left_expression + right_addition_or_subtraction
 
-    def __left_expression(self, lexer):
+    def __left_addition_or_subtraction(self, lexer):
         """Parse an left expression."""
-        terminal = self.__terminal(lexer)
+        left_expression = self.__left_expression(lexer)
         right_multiplication_or_division = self.__right_multiplication_or_division(lexer)
 
-        return terminal if right_multiplication_or_division is None else terminal * right_multiplication_or_division
+        return left_expression if right_multiplication_or_division is None else left_expression * right_multiplication_or_division
+
+    def __left_expression(self, lexer):
+        """Parse an left expression"""
+        terminal = self.__terminal(lexer)
+        right_potenciation = self.__right_potenciation(lexer)
+
+        return terminal if right_potenciation is None else terminal ** right_potenciation
 
     def __right_addition_or_subtraction(self, lexer):
         """Parse an right addition or subtraction expression."""
@@ -125,10 +143,10 @@ class Parser:
             if token.value not in "+-":
                 lexer.error(f"Unexpected token: '{token.value}'")
 
-            left_expression = self.__left_expression(lexer)
+            left_addition_or_subtraction = self.__left_addition_or_subtraction(lexer)
             _ = self.__right_addition_or_subtraction(lexer)
 
-            return left_expression if token.value == "+" else -1 * left_expression
+            return left_addition_or_subtraction if token.value == "+" else -1 * left_addition_or_subtraction
 
         lexer.put_back()
         return None
@@ -141,11 +159,27 @@ class Parser:
             return None
 
         if token.token_type == Lexer.OPERATOR and token.value in "*/":
-            terminal = self.__terminal(lexer)
+            left_expression = self.__left_expression(lexer)
             _ = self.__right_multiplication_or_division(lexer)
 
-            return terminal if token.value == "*" else 1 / terminal
+            return left_expression if token.value == "*" else 1 / left_expression
         
+        lexer.put_back()
+        return None
+
+    def __right_potenciation(self, lexer):
+        "Parse an right potenciation."
+        try:
+            token = next(lexer)
+        except StopIteration:
+            return None
+
+        if token.token_type == Lexer.OPERATOR and token.value == "**":
+            left_expression = self.__left_expression(lexer)
+            _ = self.__right_potenciation(lexer)
+
+            return left_expression
+
         lexer.put_back()
         return None
 
@@ -171,6 +205,10 @@ class Parser:
 
 
 if __name__ == "__main__":
+    # expressions = [
+    #     "1 + 2 * 3"
+    # ]
+
     expressions = [
         "1 + 1",
         "2 * 3",
@@ -187,7 +225,8 @@ if __name__ == "__main__":
         "-1 - 2",
         "4 - 5",
         "3 - ((8 + 3) * -2)",
-        "2.01e2 - 200"
+        "2.01e2 - 200",
+        "3 ** 2"
     ]
 
     parser = Parser()
