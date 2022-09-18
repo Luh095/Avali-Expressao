@@ -1,6 +1,3 @@
-from copyreg import constructor
-
-
 """Implements the tree algorithm"""
 
 class Tree:
