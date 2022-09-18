@@ -1,7 +1,8 @@
 """A"""
 from token_model import Token
 from derivation_tree_generator import DerivationTreeGenerator
-
+from token_type import TokenType
+from lexer import Lexer
 
 class Parser:
     """A"""
@@ -10,24 +11,24 @@ class Parser:
         """A"""
         if tree is not None:
             cargo = tree.cargo
-            if cargo.token_type == "operator":
+            if cargo.token_type == TokenType.OPERATOR:
                 left = self.parse(tree.left)
                 right = self.parse(tree.right)
-                return left + right if cargo.value == "+" else left * right
+
+                if cargo.value in "+-":
+                    return left + (right if cargo.value == "+" else (right * -1))
+                if cargo.value in "*/":
+                    return left * (right if cargo.value == "*" else (1/right))
             
-            if cargo.token_type == "number":
+            if cargo.token_type == TokenType.NUMBER:
                 return cargo.value
         
         return None
 
 if __name__ == "__main__":
-    derivation_tree_generator = DerivationTreeGenerator([
-        Token("number", 3),
-        Token("operator", "+"),
-        Token("number", 4),
-        Token("operator", "*"),
-        Token("number", 4),
-        Token("end_of_source", "EOF")])
+    lexer = Lexer("(3 + 4) * 5")
+    tokens = lexer.create_tokens()
+    derivation_tree_generator = DerivationTreeGenerator(tokens)
     derivation_tree = derivation_tree_generator.create_tree()
     parser = Parser()
     result = parser.parse(derivation_tree)
