@@ -6,4 +6,5 @@ class TokenType:
     OPERATOR = 1
     OPEN_PARENTHESE = 2
     CLOSE_PARENTHESE = 3
-    END_OF_SOURCE = 4
+    IDENTIFIER = 4
+    END_OF_SOURCE = 5
